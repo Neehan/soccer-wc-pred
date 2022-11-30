@@ -1,12 +1,12 @@
 import pandas as pd
-import constants as const
+import src.constants as const
 import seaborn as sns
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import scipy as sp
 import numpy as np
-from Dataset import Dataset
-from Model import Model
+from src.Dataset import Dataset
+from src.Model import Model
 
 plt.style.use("ggplot")
 
@@ -73,17 +73,17 @@ def predict_match_outcomes(
     country_models, country_dfs, country1, country2, verbose=True, condition=True
 ):
     lams = []
-    for country, opponent in [(country1, country2), (country2, country1)]:
-        model = country_models[country]
+    for home, opponent in [(country1, country2), (country2, country1)]:
+        model = country_models[home]
 
-        country_rating = country_dfs[country]["team_postmatch_points"].iat[-1]
+        country_rating = country_dfs[home]["team_postmatch_points"].iat[-1]
         opponent_rating = country_dfs[opponent]["team_postmatch_points"].iat[-1]
-        match_status = country_dfs[country]["match_status"].iat[-1]
+        match_status = country_dfs[home]["match_status"].iat[-1]
 
         # give all middle eastern countries home adv
         mid_east_countries = ["Qatar"]
-        if country in mid_east_countries or opponent in mid_east_countries:
-            home_adv = 2 * (country in mid_east_countries) - 1
+        if home in mid_east_countries or opponent in mid_east_countries:
+            home_adv = 2 * (home in mid_east_countries) - 1
         else:
             home_adv = 0
 
@@ -92,8 +92,9 @@ def predict_match_outcomes(
         ).T
 
         if condition:
-            country_vs_opponent_df = country_dfs[country][
-                country_dfs[country]["opponent_team"] == opponent
+            print(f"conditioning {home}")
+            country_vs_opponent_df = country_dfs[home][
+                country_dfs[home]["opponent_team"] == opponent
             ]
             model.add_conditioning_data(country_vs_opponent_df)
             for _ in tqdm(range(len(country_vs_opponent_df))):

@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
-import constants as const
-from Dataset import Dataset
+import src.constants as const
+from src.Dataset import Dataset
 
 
 class Model:

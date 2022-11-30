@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from os import path
 
-from Model import Model
-from Dataset import Dataset
-import constants as const
-import utils
+from src.Model import Model
+from src.Dataset import Dataset
+import src.constants as const
+import src.utils as utils
 
 np.random.seed(12)
 np.seterr(divide="raise")
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     #         + f"\t{dataset.true_lams[i]:.3f}\t{dataset.goals[i]}"
     #     )
 
-    data_path = "../data/soccer_df.csv"
+    data_path = "data/soccer_df.csv"
     if path.isfile(data_path):
         soccer_df_path = data_path
     else:

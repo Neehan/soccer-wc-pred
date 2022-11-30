@@ -1,5 +1,5 @@
 import numpy as np
-import constants as const
+from . import constants as const
 
 
 class Dataset:
