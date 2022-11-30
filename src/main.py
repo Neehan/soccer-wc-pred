@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from Model import Model
+from old_model import Model as OldModel
 from Dataset import Dataset
 
 np.random.seed(12)
@@ -19,12 +20,17 @@ if __name__ == "__main__":
     print("Rank diff\tHome Adv\tMatch Status\tIota\tLambda\tGoals")
     for i in range(10):
         print(
-            f"{dataset.features[0][i]:.3f}\t\t{dataset.features[1][i]:.3f}\t\t{dataset.features[2][i]:.3f}\t\t{dataset.true_iotas[i]:.3f}"
+            f"{dataset.features[0][i]:.3f}\t\t{dataset.features[1][i]:.3f}\t\t"
+            + f"{dataset.features[2][i]:.3f}\t\t{dataset.true_iotas[i]:.3f}"
             + f"\t{dataset.true_lams[i]:.3f}\t{dataset.goals[i]}"
         )
 
-    model = Model(dataset, I=0.0, sigma=0.03)
+    model = Model(dataset, I=0.4, sigma=0.03)
     for i in tqdm(range(len(dataset))):
         model.step()
 
-    model.plot_params()
+    model = OldModel(dataset, I=0.4, sigma=0.03)
+    for i in tqdm(range(len(dataset))):
+        model.step()
+
+    # model.plot_params()

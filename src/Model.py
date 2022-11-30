@@ -1,6 +1,7 @@
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
+
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -60,18 +61,72 @@ class Model:
             log_prior,
             self.dataset.features[:3, self.index],
             goal,
-            self.param_ranges,
-            self.iota_drift_pdf,
         )
-        arglow_estimate, argmap_estimate, arghigh_estimate = self._estimate_params()
-        self.argmap_estimate.append(argmap_estimate)
-        self.arglow_estimate.append(arglow_estimate)
-        self.arghigh_estimate.append(arghigh_estimate)
+        self._estimate_params()
 
         self.index += 1
         if self.index < len(self.dataset):
             lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
             self.next_match_lam_pred.append(lams)
+
+    def append_dataset(self, features, goals, dates):
+        self.dataset.append(features, goals, dates, preprocess=True)
+        # next match lambda is not predicted for the last match
+        # of the training dataset
+        lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
+        self.next_match_lam_pred.append(lams)
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _next_posterior(self, log_prior, features, goal):
+        rating_diff, home_adv, match_status = features
+
+        lam = jnp.exp(
+            self.param_ranges[2].reshape(1, 1, -1)
+            + self.param_ranges[0].reshape(-1, 1, 1) * rating_diff
+            + self.param_ranges[1].reshape(1, -1, 1) * match_status
+        )
+        log_likelihood = jsp.stats.poisson.logpmf(goal, lam)
+        posterior = jnp.exp(log_prior + log_likelihood) @ self.iota_drift_pdf
+        # normalize so that pdf sums to 1
+        posterior /= jnp.sum(posterior)
+
+        # add a small epsilon to prevent overflow in log
+        log_posterior = jnp.log(posterior + 1e-500)
+        return log_posterior
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def _get_margin_cdf(self, log_posterior, sum_axes):
+        margin = jnp.sum(jnp.exp(log_posterior), axis=sum_axes)
+        return jnp.cumsum(margin / jnp.sum(margin))
+
+    def _estimate_param(self, log_posterior, sum_axes):
+        margin_cdf = self._get_margin_cdf(log_posterior, sum_axes)
+        arglow_estimate = np.argmax(margin_cdf > (1 - self.conf_p) / 2)
+        arghigh_estimate = (
+            np.argmax(margin_cdf > self.conf_p + (1 - self.conf_p) / 2) - 1
+        )
+        return arglow_estimate, arghigh_estimate
+
+    def _estimate_params(self):
+        argmap_estimate = np.unravel_index(
+            np.argmax(self.log_posterior, axis=None), self.log_posterior.shape
+        )
+
+        iota_range_estimate = self._estimate_param(self.log_posterior, sum_axes=(0, 1))
+        alpha1_range_estimate = self._estimate_param(
+            self.log_posterior, sum_axes=(1, 2)
+        )
+        alpha2_range_estimate = self._estimate_param(
+            self.log_posterior, sum_axes=(0, 2)
+        )
+
+        arglow_estimate, arghigh_estimate = tuple(
+            zip(*[alpha1_range_estimate, alpha2_range_estimate, iota_range_estimate])
+        )
+
+        self.argmap_estimate.append(argmap_estimate)
+        self.arglow_estimate.append(arglow_estimate)
+        self.arghigh_estimate.append(arghigh_estimate)
 
     def predict(self, features, preprocess=False):
         if preprocess:
@@ -157,47 +212,3 @@ class Model:
         fig.set_figwidth(10)
         fig.legend(*(ax[0].get_legend_handles_labels()), loc="upper left")
         plt.show()
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _next_posterior(self, log_prior, features, goal, param_ranges, iota_drift_pdf):
-        rating_diff, home_adv, match_status = features
-        lam = jnp.exp(
-            param_ranges[2].reshape(1, 1, -1)
-            + param_ranges[0].reshape(-1, 1, 1) * rating_diff
-            + param_ranges[1].reshape(1, -1, 1) * match_status
-        )
-        log_likelihood = jsp.stats.poisson.logpmf(goal, lam)
-        log_posterior = log_prior + log_likelihood
-
-        posterior = jnp.exp(log_posterior) @ iota_drift_pdf
-        # normalize so that pdf sums to 1
-        posterior /= jnp.sum(posterior)
-
-        # add a small epsilon to prevent overflow in log
-        log_posterior = jnp.log(posterior + 1e-200) + 200
-        return log_posterior
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _get_margin_cdf(self, sum_axes):
-        margin = jnp.sum(jnp.exp(self.log_posterior), axis=sum_axes)
-        return jnp.cumsum(margin / jnp.sum(margin))
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _estimate_params(self):
-        argmap_estimate = tuple(
-            np.argwhere(self.log_posterior == self.log_posterior.max())[0]
-        )
-
-        margin_iota = self._get_margin_cdf(sum_axes=(0, 1))
-        margin_alpha1 = self._get_margin_cdf(sum_axes=(1, 2))
-        margin_alpha2 = self._get_margin_cdf(sum_axes=(0, 2))
-
-        arglow_estimate = tuple(
-            np.argwhere(margin_cdf < (1 - self.conf_p) / 2)[-1][0]
-            for margin_cdf in [margin_alpha1, margin_alpha2, margin_iota]
-        )
-        arghigh_estimate = tuple(
-            np.argwhere(margin_cdf > self.conf_p + (1 - self.conf_p) / 2)[0][0]
-            for margin_cdf in [margin_alpha1, margin_alpha2, margin_iota]
-        )
-        return arglow_estimate, argmap_estimate, arghigh_estimate

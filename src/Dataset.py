@@ -1,4 +1,5 @@
 import numpy as np
+import constants as const
 
 
 class Dataset:
@@ -35,7 +36,14 @@ class Dataset:
             self.feature_means = np.mean(features, axis=1).reshape(-1, 1)
             self.feature_stds = np.std(features, axis=1).reshape(-1, 1)
 
-        return (features - self.feature_means) / (FEATURE_STD_SCALE * self.feature_stds)
+        return (features - self.feature_means) / (
+            const.FEATURE_STD_SCALE * self.feature_stds
+        )
+
+    def append(self, features: np.array, goals: np.array, dates=None, preprocess=True):
+        self.features += self.preprocess(features, save_params=False)
+        self.goals += goals
+        self.dates += list(range(features.shape[1])) if dates is None else dates
 
     def __len__(self):
         return self.features.shape[1]
@@ -53,7 +61,7 @@ class Dataset:
         features[0] += 100 * features[1]
 
         features = (features - features.mean(axis=1).reshape(-1, 1)) / (
-            FEATURE_STD_SCALE * features.std(axis=1).reshape(-1, 1)
+            const.FEATURE_STD_SCALE * features.std(axis=1).reshape(-1, 1)
         )
 
         iotas = I + np.random.normal(0, sigma, dataset_size).cumsum()
