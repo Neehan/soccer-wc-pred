@@ -2,6 +2,8 @@ from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.style.use("ggplot")
+
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -86,6 +88,7 @@ class Model:
         self.arghigh_estimate = self.arghigh_estimate[: self.train_len]
         self.argmap_estimate = self.argmap_estimate[: self.train_len]
         self.log_posterior = self.train_logposterior
+        self.index = self.train_len
 
     @partial(jax.jit, static_argnums=(0,))
     def _next_posterior(self, log_prior, features, goal):
