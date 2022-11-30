@@ -25,7 +25,9 @@ class Dataset:
         else:
             self.true_params = False
 
-        self.dates = list(range(self.features.shape[1])) if dates is None else dates
+        self.dates = (
+            list(range(self.features.shape[1])) if dates is None else list(dates)
+        )
 
     def preprocess(self, features, save_params=False):
         # features: rank diff, home adv, match_status
@@ -40,10 +42,19 @@ class Dataset:
             const.FEATURE_STD_SCALE * self.feature_stds
         )
 
-    def append(self, features: np.array, goals: np.array, dates=None, preprocess=True):
-        self.features += self.preprocess(features, save_params=False)
-        self.goals += goals
-        self.dates += list(range(features.shape[1])) if dates is None else dates
+    def append(self, df, preprocess=True):
+        feature_names = ["rating_diffs", "home_adv", "match_status"]
+        features = np.array(df[feature_names]).T
+        if preprocess:
+            features = self.preprocess(features, save_params=False)
+        self.features = np.hstack((self.features, features))
+        self.goals = np.hstack((self.goals, np.array(df.team_score)))
+        self.dates += list(df.date)
+
+    def remove(self, idx):
+        self.features = self.features[:, :idx]
+        self.goals = self.goals[:idx]
+        self.dates = self.dates[:idx]
 
     def __len__(self):
         return self.features.shape[1]
@@ -75,4 +86,14 @@ class Dataset:
             iotas,
             lams,
             (alpha1, alpha2, sigma, I),
+        )
+
+    @classmethod
+    def from_dataframe(cls, df):
+        feature_names = ["rating_diffs", "home_adv", "match_status"]
+        return cls(
+            np.array(df[feature_names]).T,
+            feature_names,
+            np.array(df.team_score),
+            np.array(df.date),
         )

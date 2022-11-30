@@ -69,12 +69,23 @@ class Model:
             lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
             self.next_match_lam_pred.append(lams)
 
-    def append_dataset(self, features, goals, dates):
-        self.dataset.append(features, goals, dates, preprocess=True)
+    def add_conditioning_data(self, data_df):
+        self.train_len = len(self.dataset)
+        self.train_logposterior = self.log_posterior.copy()
+
+        self.dataset.append(data_df, preprocess=True)
         # next match lambda is not predicted for the last match
         # of the training dataset
         lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
         self.next_match_lam_pred.append(lams)
+
+    def remove_conditioning_data(self):
+        self.dataset.remove(self.train_len)
+        self.next_match_lam_pred = self.next_match_lam_pred[: self.train_len - 1]
+        self.arglow_estimate = self.arglow_estimate[: self.train_len]
+        self.arghigh_estimate = self.arghigh_estimate[: self.train_len]
+        self.argmap_estimate = self.argmap_estimate[: self.train_len]
+        self.log_posterior = self.train_logposterior
 
     @partial(jax.jit, static_argnums=(0,))
     def _next_posterior(self, log_prior, features, goal):
@@ -99,7 +110,7 @@ class Model:
         margin = jnp.sum(jnp.exp(log_posterior), axis=sum_axes)
         return jnp.cumsum(margin / jnp.sum(margin))
 
-    def _estimate_param(self, log_posterior, sum_axes):
+    def _estimate_param_range(self, log_posterior, sum_axes):
         margin_cdf = self._get_margin_cdf(log_posterior, sum_axes)
         arglow_estimate = np.argmax(margin_cdf > (1 - self.conf_p) / 2)
         arghigh_estimate = (
@@ -107,16 +118,22 @@ class Model:
         )
         return arglow_estimate, arghigh_estimate
 
-    def _estimate_params(self):
-        argmap_estimate = np.unravel_index(
-            np.argmax(self.log_posterior, axis=None), self.log_posterior.shape
+    @partial(jax.jit, static_argnums=(0))
+    def _estimate_map(self, log_posterior):
+        return jnp.unravel_index(
+            jnp.argmax(log_posterior, axis=None), log_posterior.shape
         )
 
-        iota_range_estimate = self._estimate_param(self.log_posterior, sum_axes=(0, 1))
-        alpha1_range_estimate = self._estimate_param(
+    def _estimate_params(self):
+        argmap_estimate = self._estimate_map(self.log_posterior)
+
+        iota_range_estimate = self._estimate_param_range(
+            self.log_posterior, sum_axes=(0, 1)
+        )
+        alpha1_range_estimate = self._estimate_param_range(
             self.log_posterior, sum_axes=(1, 2)
         )
-        alpha2_range_estimate = self._estimate_param(
+        alpha2_range_estimate = self._estimate_param_range(
             self.log_posterior, sum_axes=(0, 2)
         )
 
