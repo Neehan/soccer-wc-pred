@@ -1,5 +1,5 @@
 import numpy as np
-from . import constants as const
+import src.constants as const
 
 
 class Dataset:
@@ -42,19 +42,19 @@ class Dataset:
             const.FEATURE_STD_SCALE * self.feature_stds
         )
 
-    def append(self, df, preprocess=True):
-        feature_names = ["rating_diffs", "home_adv", "match_status"]
-        features = np.array(df[feature_names]).T
-        if preprocess:
-            features = self.preprocess(features, save_params=False)
-        self.features = np.hstack((self.features, features))
-        self.goals = np.hstack((self.goals, np.array(df.team_score)))
-        self.dates += list(df.date)
+    # def append(self, df, preprocess=True):
+    #     feature_names = ["rating_diffs", "home_adv", "match_status"]
+    #     features = np.array(df[feature_names]).T
+    #     if preprocess:
+    #         features = self.preprocess(features, save_params=False)
+    #     self.features = np.hstack((self.features, features))
+    #     self.goals = np.hstack((self.goals, np.array(df.team_score)))
+    #     self.dates += list(df.date)
 
-    def remove(self, idx):
-        self.features = self.features[:, :idx]
-        self.goals = self.goals[:idx]
-        self.dates = self.dates[:idx]
+    # def remove(self, idx):
+    #     self.features = self.features[:, :idx]
+    #     self.goals = self.goals[:idx]
+    #     self.dates = self.dates[:idx]
 
     def __len__(self):
         return self.features.shape[1]

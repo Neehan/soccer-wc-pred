@@ -69,15 +69,14 @@ def fit_model(team_df, conf_p=0.95, I=0.7, sigma=0.05):
     return model
 
 
-def predict_match_outcomes(
-    country_models, country_dfs, country1, country2, verbose=True, condition=True
-):
+def predict_match_outcomes(country_models, country_dfs, country_names, verbose=True):
     lams = []
-    for home, opponent in [(country1, country2), (country2, country1)]:
+    for home, opponent in [country_names, reversed(country_names)]:
         model = country_models[home]
 
         country_rating = country_dfs[home]["team_postmatch_points"].iat[-1]
         opponent_rating = country_dfs[opponent]["team_postmatch_points"].iat[-1]
+        # most likely to be a wc match
         match_status = country_dfs[home]["match_status"].iat[-1]
 
         # give all middle eastern countries home adv
@@ -91,26 +90,15 @@ def predict_match_outcomes(
             [[country_rating - opponent_rating, home_adv, match_status]]
         ).T
 
-        if condition:
-            print(f"conditioning {home}")
-            country_vs_opponent_df = country_dfs[home][
-                country_dfs[home]["opponent_team"] == opponent
-            ]
-            model.add_conditioning_data(country_vs_opponent_df)
-            for _ in tqdm(range(len(country_vs_opponent_df))):
-                model.step()
-
         lam_country = model.predict(features, preprocess=True)[1]
         lams.append(lam_country)
-        if condition:
-            model.remove_conditioning_data()
 
     country1_win_prob = 1 - sp.stats.skellam.cdf(0, *lams)
-    country2_win_prob = 1 - sp.stats.skellam.cdf(0, lams[1], lams[0])
+    country2_win_prob = 1 - sp.stats.skellam.cdf(0, *reversed(lams))
     draw_prob = 1 - country1_win_prob - country2_win_prob
 
     if verbose:
-        _plot_match_outcomes(lams, country1, country2)
+        _plot_match_outcomes(lams, *country_names)
     return country1_win_prob, country2_win_prob, draw_prob
 
 
@@ -140,12 +128,6 @@ def _plot_match_outcomes(lams, country1, country2):
         sp.stats.poisson.pmf(range(6), lams[0]),
         sp.stats.poisson.pmf(range(6), lams[1]),
     )
-    # top 3 outcomes
-    # top_n = np.unravel_index(np.argsort(prob_outcomes.ravel())[-3:], prob_outcomes.shape)
-    # labels = np.zeros(prob_outcomes.shape)
-    # labels[top_n] = 1
-    # labels = labels * prob_outcomes
-
     sns.heatmap(
         prob_outcomes, annot=True, fmt=".1%", cbar=False, cmap="Blues", vmin=0.08
     )

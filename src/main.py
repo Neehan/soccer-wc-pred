@@ -54,8 +54,6 @@ if __name__ == "__main__":
     utils.predict_match_outcomes(
         country_models,
         country_dfs,
-        "Brazil",
-        "Argentina",
+        ["Brazil", "Argentina"],
         verbose=True,
-        condition=True,
     )

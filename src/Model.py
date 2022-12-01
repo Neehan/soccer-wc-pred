@@ -1,15 +1,15 @@
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
-
-plt.style.use("ggplot")
-
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
+import copy
 
 import src.constants as const
 from src.Dataset import Dataset
+
+plt.style.use("ggplot")
 
 
 class Model:
@@ -61,7 +61,7 @@ class Model:
         goal = self.dataset.goals[self.index]
         self.log_posterior = self._next_posterior(
             log_prior,
-            self.dataset.features[:3, self.index],
+            self.dataset.features[:, self.index],
             goal,
         )
         self._estimate_params()
@@ -71,24 +71,24 @@ class Model:
             lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
             self.next_match_lam_pred.append(lams)
 
-    def add_conditioning_data(self, data_df):
-        self.train_len = len(self.dataset)
-        self.train_logposterior = self.log_posterior.copy()
+    # def add_conditioning_data(self, data_df):
+    #     self.train_len = len(self.dataset)
+    #     self.train_logposterior = copy.deepcopy(self.log_posterior)
 
-        self.dataset.append(data_df, preprocess=True)
-        # next match lambda is not predicted for the last match
-        # of the training dataset
-        lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
-        self.next_match_lam_pred.append(lams)
+    #     self.dataset.append(data_df, preprocess=True)
+    #     # next match lambda is not predicted for the last match
+    #     # of the training dataset
+    #     lams = self.predict(self.dataset.features[:, self.index : self.index + 1])
+    #     self.next_match_lam_pred.append(lams)
 
-    def remove_conditioning_data(self):
-        self.dataset.remove(self.train_len)
-        self.next_match_lam_pred = self.next_match_lam_pred[: self.train_len - 1]
-        self.arglow_estimate = self.arglow_estimate[: self.train_len]
-        self.arghigh_estimate = self.arghigh_estimate[: self.train_len]
-        self.argmap_estimate = self.argmap_estimate[: self.train_len]
-        self.log_posterior = self.train_logposterior
-        self.index = self.train_len
+    # def remove_conditioning_data(self):
+    #     self.dataset.remove(self.train_len)
+    #     self.next_match_lam_pred = self.next_match_lam_pred[: self.train_len - 1]
+    #     self.arglow_estimate = self.arglow_estimate[: self.train_len]
+    #     self.arghigh_estimate = self.arghigh_estimate[: self.train_len]
+    #     self.argmap_estimate = self.argmap_estimate[: self.train_len]
+    #     self.log_posterior = self.train_logposterior
+    #     self.index = self.train_len
 
     @partial(jax.jit, static_argnums=(0,))
     def _next_posterior(self, log_prior, features, goal):
